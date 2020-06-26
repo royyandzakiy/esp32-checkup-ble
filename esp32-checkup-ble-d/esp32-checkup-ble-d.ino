@@ -1,22 +1,10 @@
 #include <BLEDevice.h>
-#include <BLEUtils.h>
 #include <BLEScan.h>
 #include <BLEAdvertisedDevice.h>
-#include <BLEServer.h>
-#include <BLE2902.h>
 
-BLEServer* pServer = NULL;
-BLECharacteristic* pCharacteristic = NULL;
-uint32_t value = 0;
-bool client_loop = true;
+bool loop_ble_client = true;
 
-// See the following for generating UUIDs:
-// https://www.uuidgenerator.net/
-
-#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
-#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
-
-//=== BLE SCAN
+//=== BLE CLIENT
 
 // The remote service we wish to connect to.
 static BLEUUID serviceUUID("4fafc201-1fb5-459e-8fcc-c5c9c331914b");
@@ -45,6 +33,10 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     if (advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(serviceUUID)) {
 
       BLEDevice::getScan()->stop();
+      
+      Serial.println("====== BLE:SCAN_TEST SUCCESS");
+      Serial.println();
+      
       myDevice = new BLEAdvertisedDevice(advertisedDevice);
       doConnect = true;
       doScan = true;
@@ -52,26 +44,6 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
     } // Found our server
   } // onResult
 }; // MyAdvertisedDeviceCallbacks
-
-void ble_scan_setup() {
-  Serial.println("====== BLE:SCAN_TEST START");
-  Serial.println("Scanning...");
-
-  pBLEScan = BLEDevice::getScan(); //create new scan
-  pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
-  pBLEScan->setInterval(100);
-  pBLEScan->setWindow(99);  // less or equal setInterval value
-}
-
-void ble_scan_loop() {
-  BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
-  Serial.print("Devices found: ");
-  Serial.println(foundDevices.getCount());
-  Serial.println("Scan done!");
-  pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
-  delay(2000);
-}
 
 //=== BLE CLIENT
 
@@ -105,6 +77,7 @@ class MyClientCallback : public BLEClientCallbacks {
 BLEClient*  pClient;
 
 bool connectToServer() {
+    Serial.println("====== BLE:CLIENT_TEST START");
     Serial.print("Forming a connection to ");
     Serial.println(myDevice->getAddress().toString().c_str());
     
@@ -154,17 +127,25 @@ bool connectToServer() {
 }
 
 void ble_client_setup() {
-  Serial.println("====== BLE:CLIENT_TEST START");
+  Serial.println("====== BLE:SCAN_TEST START");
+  Serial.println("Scanning...");
   
   // Retrieve a Scanner and set the callback we want to use to be informed when we
   // have detected a new device.  Specify that we want active scanning and start the
   // scan to run for 5 seconds.
   BLEScan* pBLEScan = BLEDevice::getScan();
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
-  pBLEScan->setInterval(1349);
-  pBLEScan->setWindow(449);
+  pBLEScan->setInterval(100);
+  pBLEScan->setWindow(99);
   pBLEScan->setActiveScan(true);
-  pBLEScan->start(5, false);
+  pBLEScan->start(scanTime, false);
+  
+  BLEScanResults foundDevices = pBLEScan->start(scanTime, false);
+  Serial.print("Devices found: ");
+  Serial.println(foundDevices.getCount());
+  Serial.println("Scan done!");  
+  pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
+  delay(2000);
 } // End of setup.
 
 void ble_client_loop() {
@@ -194,74 +175,7 @@ void ble_client_loop() {
   }
   
   delay(1000); // Delay a second between loops.
-  
-  client_loop = false; // End Loop Here
-}
-
-//=== BLE SERVER
-
-class MyServerCallbacks: public BLEServerCallbacks {
-    void onConnect(BLEServer* pServer) {
-      BLEDevice::startAdvertising();
-      Serial.println("Patient Succesfully Connected!");
-    };
-
-    void onDisconnect(BLEServer* pServer) {
-      Serial.println("Patient Succesfully Disonnected!");
-      Serial.println("====== BLE:SERVER_TEST SUCCESS");
-      Serial.println();
-    }
-};
-
-class MyCallbacks: public BLECharacteristicCallbacks {
-    void onWrite(BLECharacteristic *pCharacteristic) {
-      std::string value = pCharacteristic->getValue();
-
-      if (value.length() > 0) {
-        Serial.println("*********");
-        Serial.print("New value: ");
-        for (int i = 0; i < value.length(); i++)
-          Serial.print(value[i]);
-
-        Serial.println();
-        Serial.println("*********");
-      }
-    }
-};
-
-void ble_server_setup() {
-  // Create the BLE Device
-  Serial.println("====== BLE:SERVER_TEST START");
-
-  // Create the BLE Server
-  pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
-
-  // Create the BLE Service
-  BLEService *pService = pServer->createService(SERVICE_UUID);
-
-  // Create a BLE Characteristic
-  pCharacteristic = pService->createCharacteristic(
-                      CHARACTERISTIC_UUID,
-                      BLECharacteristic::PROPERTY_READ   |
-                      BLECharacteristic::PROPERTY_WRITE
-                    );
-
-  // https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.descriptor.gatt.client_characteristic_configuration.xml
-  // Create a BLE Descriptor
-  pCharacteristic->addDescriptor(new BLE2902());
-  pCharacteristic->setValue("Change this value!");
-
-  // Start the service
-  pService->start();
-
-  // Start advertising
-  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-  pAdvertising->addServiceUUID(SERVICE_UUID);
-  pAdvertising->setScanResponse(true);
-  pAdvertising->setMinPreferred(0x0);  // set value to 0x00 to not advertise this parameter
-  BLEDevice::startAdvertising();
-  Serial.println("Waiting a client connection to notify...");
+  loop_ble_client = false;
 }
 
 //=== BASIC
@@ -271,16 +185,11 @@ void setup() {
   BLEDevice::init("DOCTOR");
   Serial.println("======****** ESP32-CHECKUP BLE:START ******======");
   Serial.println("======            ROLE: DOCTOR             ======");
-//  ble_server_setup();
+  ble_client_setup();
 }
 
 void loop() {
-  if (client_loop) {
-    ble_scan_setup();
-    ble_scan_loop();
-    Serial.println("====== BLE:SCAN_TEST SUCCESS");
-    Serial.println();
-    ble_client_setup();
+  if (loop_ble_client) {
     ble_client_loop();
     Serial.println("======****** ESP32-CHECKUP BLE:FINISH ******======");
   }
