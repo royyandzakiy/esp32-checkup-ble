@@ -1,25 +1,3 @@
-/*
-    Video: https://www.youtube.com/watch?v=oCMOYS71NIU
-    Based on Neil Kolban example for IDF: https://github.com/nkolban/esp32-snippets/blob/master/cpp_utils/tests/BLE%20Tests/SampleNotify.cpp
-    Ported to Arduino ESP32 by Evandro Copercini
-    updated by chegewara
-
-   Create a BLE server that, once we receive a connection, will send periodic notifications.
-   The service advertises itself as: 4fafc201-1fb5-459e-8fcc-c5c9c331914b
-   And has a characteristic of: beb5483e-36e1-4688-b7f5-ea07361b26a8
-
-   The design of creating the BLE server is:
-   1. Create a BLE Server
-   2. Create a BLE Service
-   3. Create a BLE Characteristic on the Service
-   4. Create a BLE Descriptor on the characteristic
-   5. Start the service.
-   6. Start advertising.
-
-   A connect hander associated with the server starts a background task that performs notification
-   every couple of seconds.
-*/
-
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEScan.h>
@@ -30,7 +8,7 @@
 BLEServer* pServer = NULL;
 BLECharacteristic* pCharacteristic = NULL;
 uint32_t value = 0;
-bool client_loop = false;
+bool client_loop = true;
 
 // See the following for generating UUIDs:
 // https://www.uuidgenerator.net/
@@ -76,10 +54,9 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 }; // MyAdvertisedDeviceCallbacks
 
 void ble_scan_setup() {
-  Serial.println("DOCTOR: SCAN MODE");
+  Serial.println("====== BLE:SCAN_TEST START");
   Serial.println("Scanning...");
 
-  BLEDevice::init("DOCTOR: CLIENT MODE");
   pBLEScan = BLEDevice::getScan(); //create new scan
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
   pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
@@ -120,6 +97,8 @@ class MyClientCallback : public BLEClientCallbacks {
   void onDisconnect(BLEClient* pclient) {
     connected = false;
     Serial.println("onDisconnect");
+    Serial.println("====== BLE:CLIENT_TEST SUCCESS");
+    Serial.println();
   }
 };
 
@@ -163,8 +142,8 @@ bool connectToServer() {
     if(pRemoteCharacteristic->canRead()) {
       std::string value = pRemoteCharacteristic->readValue();
       Serial.print("The characteristic value was: \"");
-      Serial.print("\"");
-      Serial.println(value.c_str());
+      Serial.print(value.c_str());
+      Serial.println("\"");
     }
 
     if(pRemoteCharacteristic->canNotify())
@@ -175,7 +154,7 @@ bool connectToServer() {
 }
 
 void ble_client_setup() {
-  Serial.println("DOCTOR: CLIENT MODE");
+  Serial.println("====== BLE:CLIENT_TEST START");
   
   // Retrieve a Scanner and set the callback we want to use to be informed when we
   // have detected a new device.  Specify that we want active scanning and start the
@@ -229,8 +208,8 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
     void onDisconnect(BLEServer* pServer) {
       Serial.println("Patient Succesfully Disonnected!");
-      client_loop = true;
-      Serial.println("Client Loop Start!");
+      Serial.println("====== BLE:SERVER_TEST SUCCESS");
+      Serial.println();
     }
 };
 
@@ -252,8 +231,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 
 void ble_server_setup() {
   // Create the BLE Device
-  Serial.println("DOCTOR: SERVER MODE");
-  BLEDevice::init("DOCTOR: SERVER MODE");
+  Serial.println("====== BLE:SERVER_TEST START");
 
   // Create the BLE Server
   pServer = BLEDevice::createServer();
@@ -290,19 +268,20 @@ void ble_server_setup() {
 
 void setup() {
   Serial.begin(115200);
+  BLEDevice::init("DOCTOR");
   Serial.println("======****** ESP32-CHECKUP BLE:START ******======");
-  ble_server_setup();
-  Serial.println("****** BLE:SERVER_TEST SUCCESS ******");
+  Serial.println("======            ROLE: DOCTOR             ======");
+//  ble_server_setup();
 }
 
 void loop() {
   if (client_loop) {
     ble_scan_setup();
     ble_scan_loop();
-    Serial.println("****** BLE:SCAN_TEST SUCCESS ******");
+    Serial.println("====== BLE:SCAN_TEST SUCCESS");
+    Serial.println();
     ble_client_setup();
     ble_client_loop();
-    Serial.println("****** BLE:CLIENT_TEST SUCCESS ******");
-  Serial.println("======****** ESP32-CHECKUP BLE:FINISH ******======");
+    Serial.println("======****** ESP32-CHECKUP BLE:FINISH ******======");
   }
 }

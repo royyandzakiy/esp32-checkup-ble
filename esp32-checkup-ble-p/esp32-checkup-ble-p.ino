@@ -9,6 +9,7 @@
 #include <BLEAdvertisedDevice.h>
 #include <BLEServer.h>
 #include <BLE2902.h>
+#include <assert.h>
 
 //---
 
@@ -24,6 +25,7 @@ static boolean doConnect = false;
 static boolean connected = false;
 static boolean doScan = false;
 boolean client_loop = false;
+static boolean with_scan_client_test = false;
 
 //---
 
@@ -130,9 +132,7 @@ class MyAdvertisedDeviceCallbacks: public BLEAdvertisedDeviceCallbacks {
 }; // MyAdvertisedDeviceCallbacks
 
 void ble_client_setup() {
-  Serial.println("PATIENT: CLIENT MODE");
-  BLEDevice::init("PATIENT: CLIENT MODE");
-  
+  Serial.println("====== BLE:CLIENT_TEST START");
   // Retrieve a Scanner and set the callback we want to use to be informed when we
   // have detected a new device.  Specify that we want active scanning and start the
   // scan to run for 5 seconds.
@@ -172,7 +172,8 @@ void ble_client_loop() {
   
   delay(1000); // Delay a second between loops.
 
-  Serial.println("****** BLE:CLIENT_TEST SUCCESS ******");
+  Serial.println("====== BLE:CLIENT_TEST SUCCESS");
+  Serial.println();
   client_loop = false; // End Loop Here
   if (!client_loop) ble_server_setup();
 }
@@ -180,11 +181,9 @@ void ble_client_loop() {
 //=== BLE SCAN
 
 void ble_scan_setup() {
-  Serial.println("PATIENT: CLIENT MODE");
-//  Serial.println("PATIENT: SCAN MODE");
+  Serial.println("====== BLE:SCAN_TEST START");
   Serial.println("Scanning...");
 
-  BLEDevice::init("PATIENT: SCAN MODE");
   pBLEScan = BLEDevice::getScan(); //create new scan
   pBLEScan->setAdvertisedDeviceCallbacks(new MyAdvertisedDeviceCallbacks());
   pBLEScan->setActiveScan(true); //active scan uses more power, but get results faster
@@ -198,6 +197,10 @@ void ble_scan_loop() {
   Serial.println(foundDevices.getCount());
   Serial.println("Scan done!");
   pBLEScan->clearResults();   // delete results fromBLEScan buffer to release memory
+  
+  assert(foundDevices.getCount() > 0);
+  Serial.println("====== BLE:SCAN_TEST SUCCESS");
+  Serial.println();
   delay(2000);
 }
 
@@ -222,8 +225,9 @@ class MyServerCallbacks: public BLEServerCallbacks {
 
     void onDisconnect(BLEServer* pServer) {
       Serial.println("Doctor Succesfully Disonnected!");
-  Serial.println("****** BLE:SERVER_TEST SUCCESS ******");
-  Serial.println("======****** ESP32-CHECKUP BLE:FINISH ******======");
+      Serial.println("====== BLE:SERVER_TEST SUCCESS");
+      Serial.println();
+      Serial.println("======****** ESP32-CHECKUP BLE:FINISH ******======");
     }
 };
 
@@ -245,8 +249,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 
 void ble_server_setup() {
   // Create the BLE Device
-  Serial.println("PATIENT: SERVER MODE");
-  BLEDevice::init("PATIENT: SERVER MODE");
+  Serial.println("====== BLE:SERVER_TEST START");
 
   // Create the BLE Server
   pServer = BLEDevice::createServer();
@@ -283,16 +286,20 @@ void ble_server_setup() {
 
 void setup() {
   Serial.begin(115200);
+  BLEDevice::init("PATIENT");
   Serial.println("======****** ESP32-CHECKUP BLE:START ******======");
-  ble_scan_setup();
-  ble_scan_loop();
-  Serial.println("****** BLE:SCAN_TEST SUCCESS ******");
-  ble_client_setup();
-  Serial.println("****** BLE:CLIENT_TEST SUCCESS ******");
+  Serial.println("======            ROLE: PATIENT            ======");
+  if (with_scan_client_test) {
+//  ble_scan_setup();
+//  ble_scan_loop();
+//  ble_client_setup();
+  } else {
+    ble_server_setup();
+  }
 }
 
 void loop() {
-  if (client_loop) {
-    ble_client_loop();
-  }
+//  if (client_loop && with_scan_client_test) {
+//    ble_client_loop();
+//  }
 }
